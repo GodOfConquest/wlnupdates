@@ -1,8 +1,8 @@
 <!-- extend base layout -->
-{% extends "base.html" %}
+{% extends "__base.html" %}
 
 {% block content %}
-	{% include 'flash.html' %}
+	{% include '_block_flash.html' %}
 	<div class="well">
 		<h3>About this site</h3>
 		<p>
@@ -32,7 +32,9 @@
 			Yep, pretty much. They're basically my blueprint for the overall design, through the codebase is completely
 			different (I wrote this basically as a "learn <a href='http://en.wikipedia.org/wiki/Model–view–controller'>MVC</a>"
 			excercise, which precluded using an extant complete system).<br />
-			Yes, the "updates" in the site-name is basically completely copied from MangaUpdates.
+			Yes, the "updates" in the site-name is basically completely copied from MangaUpdates.<br />
+			It's probably accurate to say there is nothing particularly <em>original</em> about this site, it's just hopefully
+			a bit more refined.
 		</p>
 		<p>
 			<strong>Why are so many of the novels missing so much data?</strong>
@@ -44,15 +46,9 @@
 		</p>
 		<p>
 			<strong>Is there a way to monitor certain series for changes?</strong>
-			I have plans to implement user customizable lists, but it's not done yet.
+			You can currently watch series, though the update tracking system is yet to be implemented, because the release
+			tracking system itself (that would feed the update system) is <em>also</em> not yet implemented.
 		</p>
-		<hr>
-		<h6>Licensing:</h6>
-		<ul>
-			<li>The code for this site was initially based on the <a href='https://github.com/miguelgrinberg/microblog'>microblog</a>
-				code by <a href='https://github.com/miguelgrinberg'>@miguelgrinberg</a></li>
-			<li>Built using SQLAlchemy, Flask, Jinja2 and Python 3!</li>
-		</ul>
 	</div>
 
 {% endblock %}

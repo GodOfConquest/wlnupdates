@@ -1,8 +1,58 @@
+<!-- extend base layout -->
+{% macro render_pagination(pagination) %}
+	<div class=pagination>
+	{%- for page in pagination.iter_pages() %}
+		{% if page %}
+			{% if page != pagination.page %}
+				<a href="{{ page }}">{{ page }}</a>
+			{% else %}
+				<strong>{{ page }}</strong>
+			{% endif %}
+		{% else %}
+			<span class=ellipsis>…</span>
+		{% endif %}
+	{%- endfor %}
+	</div>
+{% endmacro %}
 
-<div class="well well-sm">
-	<p>Hey there!</p>
-	<p>This site is currently a bit of a work-in-progress.</p>
-	<p>Yes, I know there is some (slightly) garbled data, and a lot of functionality is not
-	quite complete yet. Please bear with it, much of the planned functionality has not
-	been implemented yet.</p>
-</div>
+{% extends "__base.html" %}
+
+{% block header %}
+	<meta name="manga-id" content="{{ series_id }}">
+{% endblock %}
+
+{% block footer %}
+	<script src="/static/js/editable.js"></script>
+	<script src="/static/js/autogrow.js"></script>
+	<script src="/static/js/bootstrap-number-input.js"></script>
+{% endblock %}
+
+{% block content %}
+	{% include '_block_flash.html' %}
+
+
+	<div class="well well-large">
+		{% if add_new %}
+			<div class='pull-right'>
+				<h4><a href='/add/{{add_new}}/'>{{add_new_text}}</a></h4>
+			</div>
+		{% endif %}
+		<h2>News Posts</h2>
+
+		<div style="clear: both;"></div>
+		{% for post in posts.items %}
+
+			<div class="well">
+				<div style='float:right'>
+					Posted on {{format_date(post.timestamp)}}
+				</div>
+					<h3>{{post.title | safe}}</h3>
+
+				{{post.body | safe}}
+			</div>
+		{% endfor %}
+
+		{{ render_pagination(posts) }}
+	</div>
+
+{% endblock %}

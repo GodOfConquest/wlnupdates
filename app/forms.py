@@ -1,15 +1,23 @@
 from flask.ext.wtf import Form
 from flask.ext.babel import gettext
-from wtforms import StringField, BooleanField, TextAreaField, FormField, PasswordField
-from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
+from wtforms import StringField
+from wtforms import BooleanField
+from wtforms import TextAreaField
+from wtforms import FormField
+from wtforms import PasswordField
+from wtforms import SelectField
+from wtforms import HiddenField
+from wtforms.fields import RadioField
+from wtforms.fields.html5 import DateTimeField
+from wtforms.validators import DataRequired
+from wtforms.validators import Length
+from wtforms.validators import Email
+from wtforms.validators import EqualTo
+from wtforms.validators import ValidationError
+from wtforms.validators import URL
 from .models import Users
 from flask.ext.bcrypt import check_password_hash
-from app import db
-from .models import Users, Post, Series, Tags, Genres, Author, Illustrators, Translators, Releases, Covers
-import markdown
-import bleach
-import wtforms
-from flask.ext.login import current_user
+from app.models import Users
 
 def loginError():
 	raise ValidationError("Your username or password is incorrect.")
@@ -29,9 +37,6 @@ class LoginForm(Form):
 		if not check_password_hash(user.password, form.password.data):
 			loginError()
 
-
-
-
 class SignupForm(Form):
 	username  =   StringField('Username', validators=[DataRequired(), Length(min=5)])
 	password  = PasswordField('Password', validators=[DataRequired(), Length(min=8), EqualTo('pconfirm', "Your passwords must match!")])
@@ -43,183 +48,99 @@ class SignupForm(Form):
 		if user is not None:
 			raise ValidationError("That username is already used! Please choose another.")
 
+class NewSeriesForm(Form):
+	name =   StringField('Series Title', validators=[DataRequired(), Length(min=1)])
+	type =   RadioField( 'Series Type',
+				validators=[DataRequired(message='You must supply select a type.')],
+				choices=[('oel', 'OEL - (original english language)'), ('translated', 'Translated')])
+
+class NewGroupForm(Form):
+	name  =   StringField('Group Name', validators=[DataRequired(), Length(min=1)])
 
 
-class EditForm(Form):
-	nickname = StringField('nickname', validators=[DataRequired()])
-	about_me = TextAreaField('about_me', validators=[Length(min=0, max=140)])
 
-	def __init__(self, original_nickname, *args, **kwargs):
-		Form.__init__(self, *args, **kwargs)
-		self.original_nickname = original_nickname
+def check_group(form, field):
 
-	def validate(self):
-		if not Form.validate(self):
-			return False
-		if self.nickname.data == self.original_nickname:
-			return True
-		if self.nickname.data != Users.make_valid_nickname(self.nickname.data):
-			self.nickname.errors.append(gettext(
-				'This nickname has invalid characters. '
-				'Please use letters, numbers, dots and underscores only.'))
-			return False
-		user = Users.query.filter_by(nickname=self.nickname.data).first()
-		if user is not None:
-			self.nickname.errors.append(gettext(
-				'This nickname is already in use. '
-				'Please choose another one.'))
-			return False
-		return True
+	try:
+		dat = int(field.data)
+	except ValueError:
+		raise ValidationError("Invalid group value! You must select a group.")
+	if dat < 0:
+		raise ValidationError("Invalid group value! You must select a group.")
+	print("group validated")
+
+def check_volume(form, field):
+	if field.data:
+		try:
+			dat = int(field.data)
+		except ValueError:
+			raise ValidationError("Volume must be an integer value!")
+	if not (field.data or form.chapter.data):
+		raise ValidationError("Volume and chapter cannot both be empty!")
+
+
+def check_chapter(form, field):
+	if field.data:
+		try:
+			dat = int(field.data)
+		except ValueError:
+			raise ValidationError("Chapter must be an integer value!")
+	if not (field.data or form.volume.data):
+		raise ValidationError("Volume and chapter cannot both be empty!")
+
+def check_sub_chapter(form, field):
+	if field.data:
+		try:
+			dat = int(field.data)
+		except ValueError:
+			raise ValidationError("Sub-Chapter must be an integer value!")
+
+
+
+class NewReleaseForm(Form):
+	volume      = StringField('Volume', validators=[check_volume])
+	chapter     = StringField('Chapter', validators=[check_chapter])
+	subChap     = StringField('Sub-Chapter', validators=[check_sub_chapter])
+	postfix     = StringField('Additional release titles', [Length(max=64)])
+	group       = SelectField('Group', validators=[check_group], coerce=int, default=-1)
+	series_id   = HiddenField('series')
+	is_oel      = HiddenField('is_oel')
+	release_pg  = StringField('Release URL', [URL(message='You must supply a link to the released chapter/volume.')])
+	releasetime = DateTimeField('Release Date', format='%Y/%m/%d %H:%M')
+
+
+# class EditForm(Form):
+# 	nickname = StringField('nickname', validators=[DataRequired()])
+# 	about_me = TextAreaField('about_me', validators=[Length(min=0, max=140)])
+
+# 	def __init__(self, original_nickname, *args, **kwargs):
+# 		Form.__init__(self, *args, **kwargs)
+# 		self.original_nickname = original_nickname
+
+# 	def validate(self):
+# 		if not Form.validate(self):
+# 			return False
+# 		if self.nickname.data == self.original_nickname:
+# 			return True
+# 		if self.nickname.data != Users.make_valid_nickname(self.nickname.data):
+# 			self.nickname.errors.append(gettext(
+# 				'This nickname has invalid characters. '
+# 				'Please use letters, numbers, dots and underscores only.'))
+# 			return False
+# 		user = Users.query.filter_by(nickname=self.nickname.data).first()
+# 		if user is not None:
+# 			self.nickname.errors.append(gettext(
+# 				'This nickname is already in use. '
+# 				'Please choose another one.'))
+# 			return False
+# 		return True
 
 
 class PostForm(Form):
-	post = StringField('post', validators=[DataRequired()])
+	title = StringField('Title', validators=[DataRequired(), Length(max=128)])
+	content = TextAreaField('Content', validators=[DataRequired()])
 
 
 class SearchForm(Form):
 	search = StringField('search', validators=[DataRequired()])
 
-
-
-
-class SeriesUpdate(Form):
-	mangaId  = wtforms.IntegerField('mangaId', validators=[DataRequired()])
-	mode     = wtforms.StringField('mode',     validators=[DataRequired()])
-	entries  = wtforms.StringField('entries',  validators=[DataRequired()])
-
-
-VALID_KEYS = {
-	'description-container'  : 'description',
-	'demographic-container'  : 'demographic',
-	'type-container'         : 'type',
-	'origin_loc-container'   : 'origin_loc',
-	'orig_lang-container'    : 'orig_lang',
-	'author-container'       : 'author',
-	'illustrators-container' : 'illustrators',
-	'tag-container'          : 'tag',
-	'genre-container'        : 'genre',
-	}
-
-def validateMangaData(data):
-	assert "entries" in data
-	assert "mangaId" in data
-
-	try:
-		itemId = int(data['mangaId'])
-	except ValueError:
-		raise AssertionError
-
-	assert itemId >= 0
-	update = {
-				'id'       : itemId,
-				'entries' : []
-			}
-
-	for item in data['entries']:
-		val = {}
-		assert 'value' in item
-		assert 'type' in item
-		assert 'key' in item
-
-		itemType = item['type']
-		assert itemType in ['singleitem', 'multiitem']
-
-		if itemType == 'singleitem':
-			val['data'] = item['value'].strip()
-		elif itemType == 'multiitem':
-			val['data'] = [entry.strip() for entry in item['value'].strip().split("\n")]
-		else:
-			raise AssertionError("Invalid item type!")
-
-		if item['key'] not in VALID_KEYS:
-			raise AssertionError("Invalid source key: '%s'!" % item['key'])
-		else:
-			val['type'] = VALID_KEYS[item['key']]
-
-		update['entries'].append(val)
-
-	# Ok, the JSON is valid, and we've more or less sanitized it.
-	# Return the processed output.
-	return update
-
-
-	#
-	# releases     =     Releases.query.filter(Releases.series==sid).all()
-	# covers       =       Covers.query.filter(Covers.series==sid).all()
-
-
-
-
-def processMangaUpdateJson(data):
-	validated = validateMangaData(data)
-
-	sid = validated['id']
-	series = Series.query.filter(Series.id==sid).one()
-
-	for entry in validated['entries']:
-		print(entry)
-		if entry['type'] == 'description':
-			processedData = markdown.markdown(bleach.clean(entry['data'], strip=True))
-			if series.description == processedData:
-				print("No change?")
-			else:
-				series.description = processedData
-				series.changeuser = current_user.id
-
-
-		elif entry['type'] == 'demographic':
-			processedData = bleach.clean(entry['data'], strip=True)
-			if series.demographic == processedData:
-				print("No change?")
-			else:
-				series.demographic = processedData
-				series.changeuser = current_user.id
-
-		elif entry['type'] == 'type':
-			processedData = bleach.clean(entry['data'], strip=True)
-			if series.type == processedData:
-				print("No change?")
-			else:
-				series.type = processedData
-				series.changeuser = current_user.id
-
-		elif entry['type'] == 'origin_loc':
-			processedData = bleach.clean(entry['data'], strip=True)
-			if series.origin_loc == processedData:
-				print("No change?")
-			else:
-				series.origin_loc = processedData
-				series.changeuser = current_user.id
-
-		elif entry['type'] == 'orig_lang':
-			processedData = bleach.clean(entry['data'], strip=True)
-			if series.orig_lang == processedData:
-				print("No change?")
-			else:
-				series.orig_lang = processedData
-				series.changeuser = current_user.id
-
-		elif entry['type'] == 'author':
-			# author       =       Author.query.filter(Author.series==sid).all()
-			pass
-		elif entry['type'] == 'illustrators':
-			# illustrators = Illustrators.query.filter(Illustrators.series==sid).all()
-			pass
-		elif entry['type'] == 'tag':
-			tags = entry['data']
-			print("tags:", tags)
-			# tags         =         Tags.query.filter(Tags.series==sid).all()
-			pass
-		elif entry['type'] == 'genre':
-			# genres       =       Genres.query.filter(Genres.series==sid).all()
-			pass
-		else:
-			raise AssertionError("Unknown modifification type!")
-
-	db.session.commit()
-
-# {'value': '',
-# 'type': 'singleitem',
-# 'key': 'demographic-container'},
-
-# {'value': 'Novel\n', 'type': 'singleitem', 'key': 'type-container'}, {'value': '', 'type': 'singleitem', 'key': 'origin_loc-container'}], 'mode': 'manga-update'}

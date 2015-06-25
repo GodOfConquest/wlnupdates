@@ -1,26 +1,48 @@
 <!-- extend base layout -->
-{% extends "base.html" %}
+{% extends "__base.html" %}
 
 {% block content %}
-	{% include 'flash.html' %}
+	{% include '_block_flash.html' %}
 	<div class="well">
 		<h3>News</h3>
-		{% include 'news.html' %}
+		{% include '_block_news.html' %}
+		<a href='/news/'>Older news</a>
+	</div>
+
+	{% set release_items = trans_release_items %}
+	{% set show_group = True %}
+
+	<div class="well well-large">
+		<h3>Latest Translated Releases:</h3>
+		{% include '_block_releases.html' %}
+		<a href='/releases/'>More Releases</a>
+	</div>
+
+	{% set release_items = oel_release_items %}
+	{% set show_group = False %}
+	<div class="well well-large">
+		<h3>Latest OEL Releases:</h3>
+		{% include '_block_releases.html' %}
+		<a href='/releases/'>More Releases</a>
 	</div>
 
 	<div class="well">
-		<h4>Random Novels</h4>
+		<h4>A few random series</h4>
 		{% for post in random_series %}
 			<div class="well well-tny">
 
-				<a href='/series-id/{{ post.id }}'>{{ post.title }}</a>
+				<a href='/series-id/{{ post.id }}/'>{{ post.title }}</a>
 
 			</div>
 		{% endfor %}
 	</div>
 
-
-	{% for post in posts.items %}
-		{% include 'post.html' %}
-	{% endfor %}
 {% endblock %}
+
+
+{% block footer %}
+	{% if g.user.is_mod() %}
+		{% include '_block_admin_scripts.html' %}
+	{% endif %}
+{% endblock %}
+

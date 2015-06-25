@@ -1,37 +1,42 @@
-from flask import g, jsonify, send_file, render_template, request
-from flask.ext.login import login_required, current_user
-# from guess_language import guess_language
-from app import app, db, lm, oid, babel
-from . import forms
-from .models import Users, Post, Series, Tags, Genres, Author, Illustrators, Translators, Releases, Covers
 
+from flask import jsonify
+from flask import render_template
+from flask import request
+from flask.ext.login import current_user
+import wtforms_json
+
+from app import app
+
+from . import api_handlers
+from . import api_handlers_admin
+
+from app.api_common import getResponse
 import traceback
 
-import wtforms_json
 wtforms_json.init()
 
-@app.route('/api', methods=['POST'])
-def handleApiPost():
-	if not current_user.is_authenticated():
-		js = {
-			"error"   : True,
-			"message" : """
+LOGIN_REQ =  """
 API Calls can only be made by a logged in user!
 
 If you are not logged in, please log in.
 
-If you do not have an account, you must create one in order to edit things."""
-		}
-		resp = jsonify(js)
+If you do not have an account, you must create one in order to edit things or watch series."""
+
+
+@app.route('/api', methods=['POST'])
+def handleApiPost():
+	if not current_user.is_authenticated():
+
+		resp = jsonify(getResponse(LOGIN_REQ, error=True))
 		resp.status_code = 200
 		resp.mimetype="application/json"
 		return resp
 
 	if not request.json:
-		print("Non-JSON request!")
+		# print("Non-JSON request!")
 		js = {
 			"error"   : True,
-			"message" : "This endpoint only accepts JSON requests."
+			"message" : "This endpoint only accepts JSON POST requests."
 		}
 		resp = jsonify(js)
 		resp.status_code = 200
@@ -54,37 +59,38 @@ def handleApiGet():
 	return render_template('not-implemented-yet.html', message="API Endpoint requires a POST request.")
 
 
-def getError(message):
-	ret = {
-		'error'   : True,
-		'message' : message
-	}
-	return ret
 
 DISPATCH_TABLE = {
-	'manga-update' : forms.processMangaUpdateJson
+	'manga-update' : api_handlers.processMangaUpdateJson,
+	'group-update' : api_handlers.processGroupUpdateJson,
+	'set-watch'    : api_handlers.setSeriesWatchJson,
+	'read-update'  : api_handlers.setReadingProgressJson,
+	'cover-update' : api_handlers.updateAddCoversJson,
 
+	'merge-id'     : api_handlers_admin.mergeSeriesItems,
+	'release-ctrl' : api_handlers_admin.alterReleaseItem,
 }
 
 def dispatchApiCall(reqJson):
+	# print("Json request:", reqJson)
 	if not "mode" in reqJson:
-		return getError("No mode in API Request!")
+		return getResponse("No mode in API Request!", error=True)
 
 	mode = reqJson["mode"]
 	if not mode in DISPATCH_TABLE:
-		return getError("Invalid mode in API Request!")
+		print("Invalid mode in request: '{mode}'".format(mode=mode))
+		return getResponse("Invalid mode in API Request ({mode})!".format(mode=mode), error=True)
 
 	dispatch_method = DISPATCH_TABLE[mode]
 	try:
-		dispatch_method(reqJson)
+		ret = dispatch_method(reqJson)
+
 	except AssertionError:
 		traceback.print_exc()
-		return getError("Invalid data in API request!")
+		print(reqJson)
+		return getResponse("Error processing API request!", error=True)
 
-	ret = {
-			"error"   : False,
-			"message" : "Wat?!"
-	}
+
 
 	return ret
 

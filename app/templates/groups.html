@@ -1,0 +1,48 @@
+<!-- extend base layout -->
+{% macro render_pagination(pagination) %}
+	<div class=pagination>
+	{%- for page in pagination.iter_pages() %}
+		{% if page %}
+			{% if page != pagination.page %}
+				<a href="{{ page }}">{{ page }}</a>
+			{% else %}
+				<strong>{{ page }}</strong>
+			{% endif %}
+		{% else %}
+			<span class=ellipsis>…</span>
+		{% endif %}
+	{%- endfor %}
+	</div>
+{% endmacro %}
+
+
+
+
+{% extends "__base.html" %}
+
+{% block content %}
+	{% include '_block_flash.html' %}
+	<div class="well well-large" style="min-height: 140px;">
+		{% if add_new %}
+			<div class='pull-right'>
+				<h4><a href='/add/{{add_new}}/'>{{add_new_text}}</a></h4>
+			</div>
+		{% endif %}
+		<h2>Translation Groups:</h2>
+
+		{{ render_pagination(sequence_item) }}
+
+
+		{% set release_items = sequence_item.items %}
+		<div>
+			{% include '_block_groups.html' %}
+		</div>
+
+		{{ render_pagination(sequence_item) }}
+
+
+
+	</div>
+
+	</ul>
+{% endblock %}

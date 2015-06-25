@@ -1,32 +1,62 @@
 <!-- extend base layout -->
-{% macro singleItemBlock(name, value, valId) -%}
+{% macro singleItemBlock(name, value, valId, width=3, extra_cls='') -%}
 	<div class="well well-tny info-item">
 		<div class="row singleitem"  id="{{valId}}-container">
-			<div class="col-md-3 rowTitle">
+			<div class="col-md-{{width}} rowTitle">
 				{{ name }}:
-				<a id='editlink' href="#" onclick="edit('{{valId}}-container');return false;">[edit]</a>
-				<a id='historylink' href="/history/{{valId}}/{{series.id}}">[history]</a>
+				<span class='text-nowrap'>
+					<a id='editlink' href="#" onclick="edit('{{valId}}-container');return false;">[edit]</a>
+					<a id='historylink' href="/history/{{valId}}/{{series.id}}">[history]</a>
+				</span>
 			</div>
-			<div class="col-md-9 rowContents" id='{{valId}}'>
-				<span class='singleitem'>{{ ( value if value else "N/A" ) | safe }}</span>
+			<div class="col-md-{{12-width}} rowContents" id='{{valId}}'>
+				<span class='singleitem {{extra_cls}}'>{{ ( value if value else "N/A" ) | safe }}</span>
 			</div>
 		</div>
 	</div>
 {%- endmacro %}
 
 
-{% macro multiItemBlock(name, inList, itemKey, valId, link_base) -%}
+{% macro singleItemBlockDropbox(name, value, valId, values, width=3) -%}
+	<div class="well well-tny info-item">
+		<div class="row dropitem"  id="{{valId}}-container">
+			<div class="col-md-{{width}} rowTitle">
+				{{ name }}:
+				<span class='text-nowrap'>
+					<a id='editlink' href="#" onclick="edit('{{valId}}-container');return false;">[edit]</a>
+					<a id='historylink' href="/history/{{valId}}/{{series.id}}">[history]</a>
+				</span>
+			</div>
+			<div class="col-md-{{12-width}} rowContents" id='{{valId}}'>
+				<div class='singleitem'>
+					<span class='dropitem-text'>{{ values[value] | safe }}</span>
+					<span class='dropitem-box' style='display: none; width:90%'>
+						<select>
+							{% for key, val in values.items() %}
+								<option value='{{key}}' {{'selected="selected"' if key == value else ''}} >{{val}}</option>
+							{% endfor %}
+						</select>
+					</span>
+				</div>
+
+			</div>
+		</div>
+	</div>
+{%- endmacro %}
+
+{% macro multiItemBlock(name, inList, itemKey, valId, link_base, width=3) -%}
 	<div class="well well-tny info-item">
 		<div class="row multiitem" id="{{valId}}-container">
-			<div class="col-md-3 rowTitle">
+			<div class="col-md-{{width}} rowTitle">
 				{{ name }}:
-				<a id='editlink' href="#" onclick="edit('{{valId}}-container');return false;">[edit]</a>
-				<a id='historylink' href="/history/{{valId}}/{{series.id}}">[history]</a>
+				<span class='text-nowrap'>
+					<a id='editlink' href="#" onclick="edit('{{valId}}-container');return false;">[edit]</a>
+					<a id='historylink' href="/history/{{valId}}/{{series.id}}">[history]</a>
+				</span>
 			</div>
-			<div class="col-md-9 rowContents" id='{{valId}}'>
+			<div class="col-md-{{12-width}} rowContents" id='{{valId}}'>
 				{% for item in inList %}
-					<span class='multiitem' id='{{valId}}'><a href="/{{link_base}}/{{item.id}}">{{ item[itemKey] }}</a>{% if not loop.last %},{% endif %}</span>
-
+					<span class='multiitem' id='{{valId}}'><a href="/{{link_base}}/{{item.id}}/">{{ item[itemKey] }}</a>{% if not loop.last %},{% endif %}</span>
 				{% else %}
 					<span class='multiitem' id='{{valId}}'>N/A</span>
 				{% endfor %}
@@ -36,13 +66,56 @@
 	</div>
 {%- endmacro %}
 
-{% macro coversBlock(covers) -%}
+
+
+{% macro multiItemList(name, inList, itemKey, valId, link_base, link=True, width=3) -%}
+	<div class="well well-tny info-item">
+		<div class="row multilist" id="{{valId}}-container">
+			<div class="col-md-{{width}} rowTitle">
+				{{ name }}:
+				<span class='text-nowrap'>
+					<a id='editlink' href="#" onclick="edit('{{valId}}-container');return false;">[edit]</a>
+					<a id='historylink' href="/history/{{valId}}/{{series.id}}">[history]</a>
+				</span>
+			</div>
+			<div class="col-md-{{12-width}} rowContents" id='{{valId}}'>
+				<ul>
+					{% for item in inList %}
+					<li><span class='multilist' id='{{valId}}'>{{ item[itemKey] }}</span></li>
+					{% endfor %}
+					{% if not inList %}
+						<span class='multilist' id='{{valId}}'></span>
+					{% endif %}
+				</ul>
+
+			</div>
+		</div>
+	</div>
+{%- endmacro %}
+
+
+{% macro mergeInto() -%}
+
+	<div class="well well-tny info-item">
+		<div class="row multilist" id="{{valId}}-container">
+			<div class="col-md-12 rowContents" id='{{valId}}'>
+				<form class="form-inline" action="javascript:merge_ajax();">
+					<label for="exampleInputEmail1">Merge-To ID</label>
+					<input type="text" class="form-control input-sm" id="dbid" placeholder="DbId">
+					<button class="btn btn-primary btn-xs">Do Merge</button>
+				</form>
+			</div>
+		</div>
+	</div>
+{%- endmacro %}
+
+{% macro coversBlock(series, covers) -%}
 
 	{% if covers %}
 		<div class='imgDiv'>
 			{% for cover in covers %}
 				<div id="cover-item" style="display: none;">
-					<img src='/cover-img/{{ cover.id }}'>
+					<img src='/cover-img/{{ cover.id }}' style='max-width: 350px; max-height: 500px;'>
 					{% if cover.description %}
 						<h4>{{cover.description}}</h4>
 					{% else %}
@@ -50,7 +123,19 @@
 					{% endif %}
 				</div>
 			{% endfor %}
-		<p id='cover-offset' style=""></p>
+
+			<p id='cover-offset' style=""></p>
+
+			<div class='cvr-edit-div'>
+				<a id='editlink' href="/series-id/{{ series.id }}/edit-covers/">[edit covers]</a>
+
+			</div>
+			{% if covers|length > 1 %}
+				<div class='cvr-btn-div'>
+					<button class="btn btn-default btn-prev" onclick="prev_cover();"><i class="glyphicon glyphicon-chevron-left"></i></button>
+					<button class="btn btn-default btn-next" onclick="next_cover();"><i class="glyphicon glyphicon-chevron-right"></i></button>
+				</div>
+			{% endif %}
 
 		</div>
 	{% else %}
@@ -99,12 +184,105 @@
 		</style>
 		<div class='imgDiv' id='x'>
 			<div id='x-desc-div'>
-				<p id='x-content'>No covers! Add one, maybe?</p>
+				<p id='x-content'>
+					<a id='editlink' href="/series-id/{{ series.id }}/edit-covers/">No covers! Add one, maybe?</a>
+				</p>
 			</div>
 		</div>
 	{% endif %}
-	<script>
 
+{%- endmacro %}
+
+
+{% macro watchBlock(watches, progress) -%}
+	<div class="well well-tny info-item">
+		<div class="row multiitem" id="watch-container">
+			<div class="col-md-3 rowTitle">
+				Watching item:
+				<span id='watch-state' class='text-nowrap light-grey'>
+					[saved]
+				</span>
+			</div>
+			<div class="col-sm-9 rowContents" id='watch'>
+				{% if watches %}
+
+					<a href="#" id="watch-link" onclick="toggle_watch('#watch-link');return false;">Yes</a>
+
+					<div id='spinner-div' style='display: inline-block; float:right;'>
+						<form class="form-inline">
+							<div class="form-group form-group-sm btn-xs chap-btn">
+								<label class="control-label-sm">Vol:</label>
+								<input id="vol" class="form-control form-control-num" type="number" value="{{ progress['vol'] | int }}" min="0" />
+							</div>
+							<div class="form-group form-group-sm btn-xs chap-btn">
+								<label class="control-label-sm">Chapter:</label>
+								<input id="chap" class="form-control form-control-num" type="number" value="{{ progress['chp'] | int }}" min="0" />
+							</div>
+							<div class="form-group form-group-sm btn-xs chap-btn">
+								<label class="control-label-sm">Fragment:</label>
+								<input id="frag" class="form-control form-control-num" type="number" value="{{ progress['frg'] | int }}" min="0" max="99" />
+							</div>
+						</form>
+					</div>
+				{% else %}
+					<a href="#" id="watch-link" onclick="toggle_watch('#watch-link');return false;">No</a>
+				{% endif %}
+			</div>
+		</div>
+	</div>
+{%- endmacro %}
+
+{% extends "__base.html" %}
+
+{% block header %}
+
+
+	<meta name="manga-id" content="{{ series_id }}">
+
+{% endblock %}
+
+{% block footer %}
+	<script src="/static/js/editable.js"></script>
+	<script src="/static/js/autogrow.js"></script>
+	<script src="/static/js/bootstrap-number-input.js"></script>
+
+	{% if g.user.is_mod() %}
+		{% include '_block_admin_scripts.html' %}
+	{% endif %}
+
+
+	<script>
+		$('#vol' ).bootstrapNumber();
+		$('#vol' ).change(readChange);
+		$('#chap').bootstrapNumber();
+		$('#chap').change(readChange);
+		$('#frag').bootstrapNumber();
+		$('#frag').change(readChange);
+
+		function merge_ajax()
+		{
+			console.log("Ready to send!");
+			var merge_id  = $("#dbid").val();
+			console.log("merge_id", merge_id)
+
+			var mangaId  = $('meta[name=manga-id]').attr('content')
+			var params = {
+				'mode'      : 'merge-id',
+				'item-id'   : mangaId,
+				'merge_id'  : merge_id
+			}
+
+
+			$.ajax({
+				url : "/api",
+				success : saveCallback(false),
+				data: JSON.stringify(params),
+				method: "POST",
+				dataType: 'json',
+				contentType: "application/json;",
+			});
+		}
+		var i = 0;
 		var pos_text = $('p[id="cover-offset"]');
 		var divs = $('div[id="cover-item"]');
 		if (divs.length == 1)
@@ -116,59 +294,240 @@
 		else if (divs.length > 1)
 		{
 			divs.hide();
-			var i = 0;
 
-			(function cycle() {
+			divs.eq(i).fadeIn(400)
+					  .delay(5000)
+					  .fadeOut(400, cycle);
+				pos_text.html("Cover " + (i+1) + " of " + divs.length);
+
+			function cycle()
+			{
+				i = ++i % divs.length;
 				divs.eq(i).fadeIn(400)
 						  .delay(5000)
 						  .fadeOut(400, cycle);
 
-				i = ++i % divs.length;
 
 				pos_text.html("Cover " + (i+1) + " of " + divs.length);
 
+			}
 
-			})();
+
+			function next_cover()
+			{
+				divs.each(function() {
+					$(this).unbind();
+					$(this).stop(true);
+					$(this).hide();
+				})
+
+				i = ++i % divs.length;
+				divs.eq(i).show();
+				pos_text.html("Cover " + (i+1) + " of " + divs.length);
+
+
+			}
+			function prev_cover()
+			{
+				divs.each(function() {
+					$(this).unbind();
+					$(this).stop(true);
+					$(this).hide();
+				})
+
+				i = --i
+				if (i < 0)
+					i = divs.length-1;
+
+				divs.eq(i).show();
+				pos_text.html("Cover " + (i+1) + " of " + divs.length);
+
+			}
+
 		}
 		else
 		{
 			// No images?
 		}
 	</script>
-{%- endmacro %}
 
-
-{% extends "base.html" %}
-
-{% block header %}
-	<meta name="csrf-token" content="{{ csrf_token() }}">
-	<meta name="manga-id" content="{{ series_id }}">
-
-	<script src="/static/js/editable.js"></script>
-	<script src="/static/js/autogrow.js"></script>
 {% endblock %}
 
+
 {% block content %}
-	{% include 'flash.html' %}
+	{% include '_block_flash.html' %}
 
 
 	<div class="well well-large">
 		<h2>{{ series.title }}</h2>
+			{{watchBlock(watch, progress)}}
+			{{coversBlock(series, series.covers)}}
 
-			{{coversBlock(covers)}}
+			{{singleItemBlock("Description",
+								series.description,
+								'description',
+								extra_cls='description'
+							)
+			}}
 
-			{{singleItemBlock("Description",       series.description, 'description'     )}}
-			{{singleItemBlock("Demographic",       series.demographic, 'demographic'     )}}
-			{{singleItemBlock("Type",              series.type,        'type'            )}}
-			{{singleItemBlock("Country of Origin", series.origin_loc,  'origin_loc'      )}}
-			{{singleItemBlock("Original Language", series.orig_lang,   'orig_lang'       )}}
-			{{multiItemBlock("Author(s)",          author,             'author',         'author',       'author-id')}}
-			{{multiItemBlock("Illustrator(s)",     illustrators,       'name',           'illustrators', 'artist-id')}}
-			{{multiItemBlock("Tags",               tags,               'tag',            'tag',          'tag-id')}}
-			{{multiItemBlock("Genres",             genres,             'genre',          'genre',        'genre-id')}}
+			{{singleItemBlockDropbox("OEL/Translated",
+								series.tl_type,
+								'tl_type',
+								{
+									"oel"        : "OEL",
+									"translated" : "Translated",
+								},
+								width=5
+							)
+			}}
 
+			{{singleItemBlock("Demographic",
+								series.demographic,
+								'demographic',
+								width=5
+							)
+			}}
+
+			{{singleItemBlockDropbox("Type",
+								series.type,
+								'type',
+								{
+									"Novel"       : "Novel",
+									"Light-Novel" : "Light-Novel",
+									"Web-Novel"   : "Web-Novel",
+								},
+								width=5
+							)
+			}}
+
+			{% if series.tl_type == 'translated' %}
+
+				{{singleItemBlockDropbox("Country of Origin",
+									series.origin_loc,
+									'origin_loc',
+									{
+										"unknown" : "Unknown",
+										"china"   : "China",
+										"japan"   : "Japan",
+										"korea"   : "Korea",
+									},
+									width=5
+								)
+				}}
+
+				{{singleItemBlock("Status in Country of Origin",
+									series.orig_status,
+									'orig_status',
+									width=5
+								)
+				}}
+
+				{{singleItemBlock("Original Language",
+									series.orig_lang,
+									'orig_lang',
+									width=5
+								)
+				}}
+
+				{{singleItemBlockDropbox("General Type",
+									series.region,
+									'region',
+									{
+										"eastern" : "Eastern",
+										"western" : "Western",
+										"unknown" : "Unknown",
+									},
+									width=5
+								)
+				}}
+
+				{% if series.license_en == True %}
+					{% set lic_state = 'True'%}
+				{% elif series.license_en == False %}
+					{% set lic_state = 'False'%}
+				{% else %}
+					{% set lic_state = 'unknown'%}
+				{% endif %}
+				{{singleItemBlockDropbox("Licensed (in english)",
+									lic_state,
+									'license_en',
+									{
+										"unknown" : "Unknown",
+										"True"    : "Yes",
+										"False"   : "No",
+									},
+									width=5
+								)
+				}}
+			{% endif %}
+
+			{{multiItemBlock("Author(s)",
+							series.author,
+								'name',
+								'author',
+								'author-id',
+								width=5
+							)
+			}}
+
+			{% if series.tl_type == 'translated' %}
+				{{multiItemBlock("Illustrator(s)",
+									series.illustrators,
+									'name',
+									'illustrators',
+									'artist-id',
+									width=5
+								)
+				}}
+			{% endif %}
+			{{multiItemBlock("Tags",
+								series.tags,
+								'tag',
+								'tag',
+								'tag-id',
+								width=5
+							)
+			}}
+			{{multiItemBlock("Genres",
+								series.genres,
+								'genre',
+								'genre',
+								'genre-id',
+								width=5
+							)
+			}}
+			{{multiItemList("Alternate Names",
+								series.alternatenames,
+								'name',
+								'altnames',
+								'altnames-id',
+								width=5
+							)
+			}}
+
+			{% if g.user.is_admin() %}
+				<hr>
+				{{mergeInto()}}
+			{% endif %}
 			<div style="clear: both;"></div>
 
+	</div>
+
+
+	{% set release_items = releases %}
+	<div class="well well-large">
+		<div style='float:right'>
+			<sup>Releases found: {{ release_items | length }}</sup>
+
+			<p>
+				<a href='/add/release/{{series.id}}/'>Add a release</a>
+			</p>
+		</div>
+		<span>
+			<h3 >Series Releases: </h3>
+			<h5 >Latest release - {{latest}}</h5>
+		</span>
+		{% include '_block_releases.html' %}
 	</div>
 
 	</ul>

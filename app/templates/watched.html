@@ -1,0 +1,84 @@
+<!-- extend base layout -->
+{% extends "__base.html" %}
+
+{% macro singleItemBlock(series, read, latest) -%}
+	{% if latest['agg'] > read['agg'] %}
+		<tr class="row singleitem red-highlight">
+	{% elif latest['agg'] <= read['agg'] and read['agg'] %}
+		<tr class="row singleitem green-highlight">
+	{% else %}
+		<tr class="row singleitem ">
+	{% endif %}
+		<td class="col-md-8 rowTitle">
+			<a href='/series-id/{{ series.id }}/'>
+				{{ series.title }}
+			</a>
+		</td>
+		<td class="col-md-2 rowContents" id='{{valId}}'>
+			{% if latest['vol'] >= 0 and latest['chp'] >= 0 %}
+				v{{latest['vol']}}, c{{latest['chp']}}
+			{% elif latest['vol'] and latest['vol'] >= 0 %}
+				v{{latest['vol']}}
+			{% elif latest['chp'] and latest['chp'] >= 0 %}
+				c{{latest['chp']}}
+			{% else %}
+				No Releases!
+			{% endif %}
+
+		</td>
+		<td class="col-md-2 rowContents" id='{{valId}}'>
+			{% if read['vol'] >= 0 and read['chp'] >= 0 %}
+				v{{read['vol']}}, c{{read['chp']}}
+			{% elif read['vol'] >= 0 %}
+				v{{read['vol']}}
+			{% elif read['chp'] >= 0 %}
+				c{{read['chp']}}
+			{% else %}
+				Unread!
+			{% endif %}
+
+
+		</td>
+	</tr>
+{%- endmacro %}
+
+{% macro headerBlock() -%}
+
+	<tr class="row singleitem">
+		<td class="col-md-8 rowTitle">
+			Series
+		</td>
+		<td class="col-md-2 rowContents" id='{{valId}}'>
+			Available
+		</td>
+		<td class="col-md-2 rowContents" id='{{valId}}'>
+			Read
+		</td>
+	</tr>
+{%- endmacro %}
+
+{% block content %}
+	{% include '_block_flash.html' %}
+
+	<div class="well well-large">
+		<h2>Watched items:</h2>
+
+		{% if watches %}
+
+			<table class='table-striped table table-bordered table-condensed fullwidth'>
+				{{ headerBlock() }}
+				{% for series, read_progress, avail_progress in watches %}
+					{{singleItemBlock(series, read_progress, avail_progress)}}
+				{% endfor %}
+			</table>
+		{% else %}
+			<p>No watched items? <a href='/series/'>Add a few?</a></p>
+		{% endif %}
+
+		<div style="clear: both;"></div>
+
+	</div>
+
+
+	</ul>
+{% endblock %}

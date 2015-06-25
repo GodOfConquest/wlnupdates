@@ -1,4 +1,9 @@
 #!flask/bin/python
+
+# import logging
+# logging.basicConfig()
+# logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+
 from app import app, db
 from citext import CIText
 from flask import Flask
@@ -6,12 +11,49 @@ from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.script import Manager
 from flask.ext.migrate import Migrate, MigrateCommand
 
+from app import models
 
-migrate = Migrate(app, db)
-
+Migrate(app, db)
 manager = Manager(app)
+
+# Unfortuntely, this couldn't be hooked into the `db upgrade` command, because it appears the changes to the DB
+# are not accessible from the flask sqlalchemy context, even when python is exiting.
+# I'm assuming it's because the changes are committed during exit, apparently.
+@manager.command
+def install_triggers():
+	'''
+	Install versioning triggers on tables
+	'''
+	print("Installing triggers")
+	models.install_triggers()
+
+# This is also true for my indexes, since they use postgres specific extensions.
+@manager.command
+def install_tgm_idx():
+	'''
+	Install trigram search indices on tables
+	'''
+	print("Installing trigram indices")
+	models.install_trigram_indices()
+# This is also true for my indexes, since they use postgres specific extensions.
+@manager.command
+def install_enum():
+	'''
+	Install enum type in db
+	'''
+	print("Installing enum indices")
+	db.engine.begin()
+	conn = db.engine.connect()
+	models.install_region_enum(conn)
+	models.install_tl_type_enum(conn)
+
+	print("Done")
+
 manager.add_command('db', MigrateCommand)
 
 
+
 if __name__ == '__main__':
-    manager.run()
+	print("Running migrator!")
+	manager.run()
+

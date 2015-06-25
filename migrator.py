@@ -1,31 +1,19 @@
-
-# DROP TABLE "alembic_version" CASCADE;
-# DROP TABLE "alternate_names" CASCADE;
-# DROP TABLE "author" CASCADE;
-# DROP TABLE "covers" CASCADE;
-# DROP TABLE "followers" CASCADE;
-# DROP TABLE "genres" CASCADE;
-# DROP TABLE "illustrators" CASCADE;
-# DROP TABLE "post" CASCADE;
-# DROP TABLE "releases" CASCADE;
-# DROP TABLE "series" CASCADE;
-# DROP TABLE "tags" CASCADE;
-# DROP TABLE "translators" CASCADE;
-# DROP TABLE "user" CASCADE;
-
-
-# DROP SEQUENCE alternate_names_id_seq;
-# DROP SEQUENCE genres_id_seq;
-# DROP SEQUENCE series_id_seq;
+#!python
+import sys
 import time
+import calendar
 import datetime
 import bleach
+import markdown
 import app.nameTools as nt
 import settings
 import psycopg2
 
 move_to_con = psycopg2.connect(host=settings.DATABASE_IP, dbname=settings.DATABASE_DB_NAME, user=settings.DATABASE_USER,password=settings.DATABASE_PASS)
-import_con = psycopg2.connect(host=settings.IMPORT_DATABASE_IP, dbname=settings.IMPORT_DATABASE_DB_NAME, user=settings.IMPORT_DATABASE_USER,password=settings.IMPORT_DATABASE_PASS)
+try:
+	import_con = psycopg2.connect(host=settings.IMPORT_DATABASE_IP, dbname=settings.IMPORT_DATABASE_DB_NAME, user=settings.IMPORT_DATABASE_USER,password=settings.IMPORT_DATABASE_PASS)
+except AttributeError:
+	pass
 
 def getItemEntry():
 	item = {
@@ -103,7 +91,7 @@ def processMngSeries(cur, name, srcTable):
 
 
 	item['name']   = row['buname'].replace('(Novel)', '').strip()
-	item['desc']   = bleach.clean(row['budescription'], strip=True)
+	item['desc']   = markdown.markdown(bleach.clean(row['budescription'], strip=True))
 	item['type']   = row['butype']
 	item['demo']   = ''
 	item['tags']   = row['butags'].split(" ")
@@ -112,8 +100,10 @@ def processMngSeries(cur, name, srcTable):
 	item['illust'] = row['buartist'].split(", ")
 
 
-	while "" in item['genre']: item['genre'].remove("")
-	while "" in item['tags']: item['tags'].remove("")
+	while "" in item['genre']:
+		item['genre'].remove("")
+	while "" in item['tags']:
+		item['tags'].remove("")
 
 	cur.execute("""SELECT name FROM munamelist WHERE buid=%s""", (row['buid'], ))
 
@@ -275,20 +265,21 @@ def processBookTbl(cur, name, srcTable):
 
 
 def insertItem(cur, item):
-	cur.execute('''INSERT INTO series (title, description, type, demographic, changeuser, changetime) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;''',
+	cur.execute('''INSERT INTO series (title, description, type, demographic, changeuser, changetime, region) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id;''',
 			(
 				item['name'],
 				item['desc'],
 				item['type'],
 				item['demo'],
 				1,
-				datetime.datetime.now()
+				datetime.datetime.now(),
+				"eastern"
 			)
 		)
 
 	pkid = cur.fetchone()[0]
 	for author in item['author']:
-		cur.execute('''INSERT INTO author (author, series, changeuser, changetime) VALUES (%s, %s, %s, %s);''', (author, pkid, 1, datetime.datetime.now()))
+		cur.execute('''INSERT INTO author (name, series, changeuser, changetime) VALUES (%s, %s, %s, %s);''', (author, pkid, 1, datetime.datetime.now()))
 
 	for illust in item['illust']:
 		cur.execute('''INSERT INTO illustrators (name, series, changeuser, changetime) VALUES (%s, %s, %s, %s);''', (illust, pkid, 1, datetime.datetime.now()))
@@ -314,13 +305,33 @@ def insertItem(cur, item):
 			""", (filename, pkid, vol, chapter, description, relpath, filehash, 1, datetime.datetime.now()))
 
 
+def install_news(cur):
+	article = '''
+	<p>This site is currently a bit of a work-in-progress.</p>
+	<p>Yes, I know there is some (slightly) garbled data, and a lot of functionality is not
+	quite complete yet. Please bear with it, much of the planned functionality has not
+	been implemented yet.</p>
+	'''
+	title = 'Hey There!'
+
+	# userid 2 is admin
+	cur.execute("""INSERT INTO posts (title, body, timestamp, user_id) VALUES (%s, %s, %s, %s);""",
+			(title, article, datetime.datetime.now(), 2)
+		)
+
 def insertData(data):
 	print("Inserting!")
 	cur = move_to_con.cursor()
+
+
 	cur.execute("BEGIN;")
+
+	base_setup(cur)
+
 	for item in data:
 		insertItem(cur, item)
 
+	install_news(cur)
 
 	print("Gross rowcounts:")
 	for table in ["alembic_version",
@@ -329,7 +340,7 @@ def insertData(data):
 					"covers",
 					"genres",
 					"illustrators",
-					"post",
+					"posts",
 					"releases",
 					"series",
 					"tags",
@@ -457,6 +468,28 @@ def consolidate(inDat):
 
 	return out
 
+
+def base_setup(cur):
+
+	cur.execute("INSERT INTO users (id, nickname, verified, has_admin, has_mod) VALUES (%s, %s) RETURNING id", (3, "rss-feeder", 1, False, False))
+	cur.execute("INSERT INTO users (id, nickname, verified, has_admin, has_mod) VALUES (%s, %s) RETURNING id", (1, "system-migrator", 1, False, False))
+
+	# Install my user ID (since the pasword is hashed AND salted, it should be safe. If not, it's not like I can't recover anyways.)
+	cur.execute("INSERT INTO users (nickname, email, password, verified, has_admin, has_mod) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+			("admin", "lemuix@gmail.com", "$2a$12$31.y.Bj9Pr705daMQFi/3.EjT0LkT80E7TJhlDqib/h5TUY0ukJU.", 1, True, True)
+		)
+
+
+	languages = [
+		"English",
+		"Japanese",
+		"Chinese",
+		"Korean",
+	]
+	for language in languages:
+		cur.execute("INSERT INTO language (language, changetime) VALUES (%s, %s)", (language, datetime.datetime.now()))
+
+
 def go():
 	print(import_con)
 
@@ -492,5 +525,79 @@ def go():
 	insertData(proc)
 
 
+def reset_db():
+
+	cur = move_to_con.cursor()
+	print("Dropping all tables!")
+
+	commands = [
+		'''DROP TABLE "users" CASCADE;''',
+		'''DELETE FROM "alembic_version";''',
+		'''DROP TABLE "alternatenames" CASCADE;''',
+		'''DROP TABLE "author" CASCADE;''',
+		'''DROP TABLE "covers" CASCADE;''',
+		'''DROP TABLE "followers" CASCADE;''',
+		'''DROP TABLE "genres" CASCADE;''',
+		'''DROP TABLE "illustrators" CASCADE;''',
+		'''DROP TABLE "posts" CASCADE;''',
+		'''DROP TABLE "releases" CASCADE;''',
+		'''DROP TABLE "series" CASCADE;''',
+		'''DROP TABLE "tags" CASCADE;''',
+		'''DROP TABLE "translators" CASCADE;''',
+		'''DROP TABLE "language" CASCADE;''',
+		'''DROP TABLE "watches" CASCADE;''',
+		'''DROP TABLE "alternatenameschanges" CASCADE;''',
+		'''DROP TABLE "authorchanges" CASCADE;''',
+		'''DROP TABLE "coverschanges" CASCADE;''',
+		'''DROP TABLE "genreschanges" CASCADE;''',
+		'''DROP TABLE "illustratorschanges" CASCADE;''',
+		'''DROP TABLE "releaseschanges" CASCADE;''',
+		'''DROP TABLE "serieschanges" CASCADE;''',
+		'''DROP TABLE "tagschanges" CASCADE;''',
+		'''DROP TABLE "translatorschanges" CASCADE;''',
+		'''DROP TABLE "languagechanges" CASCADE;''',
+		'''DROP TABLE "feeds" CASCADE;''',
+		'''DROP TABLE "feedauthors" CASCADE;''',
+		'''DROP TABLE "feedtags" CASCADE;''',
+		'''DROP TYPE region_enum;''',
+
+	]
+	for command in commands:
+		try:
+			cur.execute("BEGIN;")
+			cur.execute(command)
+			cur.execute('COMMIT;')
+		except psycopg2.ProgrammingError as e:
+			cur.execute("ROLLBACK")
+			print("Error:", str(e).strip())
+
+def create_tl_alts():
+	from app.models import AlternateTranslatorNames, Translators
+	from app import db
+	groups = Translators.query.all()
+	print(groups)
+	for group in groups:
+		new = AlternateTranslatorNames(
+			group      = group.id,
+			name       = group.name,
+			cleanname  = nt.prepFilenameForMatching(group.name),
+			changetime = datetime.datetime.now(),
+			changeuser = 3,
+			)
+		print(new)
+
+		db.session.add(new)
+		db.session.commit()
+	pass
+
 if __name__ == "__main__":
-	go()
+	if "destroy" in sys.argv:
+		print("DESTROYING DATABASE! WARNING! WARNING!")
+		reset_db()
+	elif "create" in sys.argv:
+		go()
+	elif "create-tl-altnames" in sys.argv:
+		create_tl_alts()
+	else:
+		print("No arguments?")
+
