@@ -216,20 +216,43 @@
 {%- endmacro %}
 
 
-{% macro watchBlock(watches, progress) -%}
+{% macro watchBlock(watches, watchlists, progress) -%}
 	<div class="well well-tny info-item">
-		<div class="row multiitem" id="watch-container">
-			<div class="col-md-3 rowTitle">
-				Watching item:
-				<span id='watch-state' class='text-nowrap light-grey'>
-					[saved]
-				</span>
+		<div class="row singleitem" id="watch-container">
+			<div style="display: inline-block; padding-left: 20px;">
+				<div class="rowTitle" style='display: inline-block; min-width: 130px; vertical-align: top;'>
+					In watch list:
+					<span id='watch-state' class='text-nowrap light-grey'>
+						[saved]
+					</span>
+				</div>
+				<div class="rowContents" id='watch' style="display: inline-block; align-self: center;">
+					<div style='display: inline-block; float: left;'>
+						<select id='watch-list-select' class="list-select form-control" onchange="edit_watch('#watch-list-select');return false;">
+
+							<option disabled>Current lists:</option>
+							{% if watchlists %}
+								{% for listname in watchlists %}
+									{% if watches.listname == listname %}
+										<option value='{{listname | safe}}' selected="selected">{{listname | safe}}</option>
+									{% else %}
+										<option value='{{listname | safe}}'>{{listname | safe}}</option>
+									{% endif %}
+								{% endfor %}
+								<option disabled>──────────</option>
+							{% endif %}
+							<option value='new-list'>{{"<new list>" | e}}</option>
+							{% if watches.listname %}
+								<option value='no-list'>{{"<remove item>" | e}}</option>
+							{% else %}
+								<option selected="selected" value='no-list'>{{"<not watched>" | e}}</option>
+							{% endif %}
+						</select>
+					</div>
+				</div>
 			</div>
-			<div class="col-sm-9 rowContents" id='watch'>
-				{% if watches %}
-
-					<a href="#" id="watch-link" onclick="toggle_watch('#watch-link');return false;">Yes</a>
-
+			<div class="rowContents"  style="float: right; padding-right: 20px;">
+				{% if watches and watchlists %}
 					<div id='spinner-div' style='display: inline-block; float:right;'>
 						<form class="form-inline">
 							<div class="form-group form-group-sm btn-xs chap-btn">
@@ -246,8 +269,6 @@
 							</div>
 						</form>
 					</div>
-				{% else %}
-					<a href="#" id="watch-link" onclick="toggle_watch('#watch-link');return false;">No</a>
 				{% endif %}
 			</div>
 		</div>
@@ -399,7 +420,7 @@
 
 	<div class="well well-large">
 		<h2>{{ series.title }}</h2>
-			{{watchBlock(watch, progress)}}
+			{{watchBlock(watch, watchlists, progress)}}
 			{{coversBlock(series, series.covers)}}
 
 			{{singleItemBlock("Description",
