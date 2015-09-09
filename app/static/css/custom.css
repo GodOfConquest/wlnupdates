@@ -1,3 +1,9 @@
+
+.padded-rule
+{
+	margin-top: 20px;
+	margin-bottom: 20px;
+}
 .fullwidth {
 	width: 100%;
 }
@@ -135,7 +141,9 @@ select.list-select
 }
 .imgDiv
 {
-	border: 2px solid #000;
+	border: 1px solid #000;
+	border-radius: 3px;
+	-webkit-border-radius: 3px;
 	vertical-align : middle;
 	text-align: center;
 	margin-bottom: 10px;
@@ -170,7 +178,7 @@ body
 
 	margin:0 auto;
 	max-width: 1100px;
-	background-color: #ccc;
+	/*background-color: #ccc;*/
 }
 
 tr.red-highlight:nth-of-type(odd) {
@@ -215,6 +223,14 @@ tr.green-highlight:nth-of-type(even) {
 
 }
 
+.updating-stalled
+{
+	background-color: #FFCCCC;
+}
+.updating-stale
+{
+	background-color: #FFFF99;
+}
 
 div.imgDiv {
 	position:relative;
