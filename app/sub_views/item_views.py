@@ -19,6 +19,7 @@ from app.models import Watches
 from sqlalchemy import desc
 from natsort import natsort_keygen
 from sqlalchemy.orm import joinedload
+import datetime
 
 def getSort(row):
 	chp = row.chapter if row.chapter else 0
@@ -32,10 +33,13 @@ def build_progress(watch):
 	progress['vol'] = 0
 	progress['chp'] = 0
 	progress['frg'] = 0
+
 	if watch:
-		progress['vol'] = watch.volume
-		progress['chp'] = int(watch.chapter)
-		progress['frg'] = int(watch.chapter * 100) % 100
+		raw_vol = watch.volume  if watch.volume  != None else 0
+		raw_chp = watch.chapter if watch.chapter != None else 0
+		progress['vol'] = raw_vol
+		progress['chp'] = int(raw_chp)
+		progress['frg'] = int(raw_chp * 100) % 100
 
 
 	progress['vol'] = max(progress['vol'], 0)
@@ -62,6 +66,13 @@ def get_latest_release(releases):
 		elif not release.volume and not max_vol and release.chapter and release.chapter >= max_chp:
 			max_chp = release.chapter
 			max_release = release
+	return max_release
+
+def get_most_recent_release(releases):
+	max_release = datetime.datetime.min
+	for release in [item for item in releases if item.include]:
+		if max_release < release.published:
+			max_release = release.published
 	return max_release
 
 def format_latest_release(release):
@@ -138,9 +149,15 @@ def renderSeriesId(sid):
 	releases.sort(reverse=True, key=getSort)
 
 
-	progress   = build_progress(watch)
-	latest     = get_latest_release(releases)
-	latest_str = format_latest_release(latest)
+	latest      = get_latest_release(releases)
+	latest_dict = build_progress(latest)
+	most_recent = get_most_recent_release(releases)
+	latest_str  = format_latest_release(latest)
+
+	if watch:
+		progress    = build_progress(watch)
+	else:
+		progress    = latest_dict
 
 	series.covers.sort(key=get_cover_sorter())
 
@@ -156,6 +173,8 @@ def renderSeriesId(sid):
 						watchlists   = watchlists,
 						progress     = progress,
 						latest       = latest,
+						latest_dict  = latest_dict,
+						most_recent  = most_recent,
 						latest_str   = latest_str
 						)
 

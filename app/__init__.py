@@ -36,6 +36,7 @@ if "debug" in sys.argv:
 	print("Flask running in debug mode!")
 	app.debug = True
 app.config.from_object('config.BaseConfig')
+app.jinja_env.add_extension('jinja2.ext.do')
 db = SQLAlchemy(app)
 lm = LoginManager()
 lm.anonymous_user = AnonUser
@@ -152,6 +153,8 @@ def utility_processor():
 			return "updating-current"
 		if delta.days <= 45:
 			return "updating-stale"
+		if delta.days > 700000:
+			return "updating-never"
 		return "updating-stalled"
 
 	def build_name_qs(keys, items):
