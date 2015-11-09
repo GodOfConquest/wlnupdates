@@ -1,0 +1,30 @@
+{% extends 'forum/layout.html' %}
+{% import 'forum/macros.html' as m %}
+
+{% block title %}{{ thread.name }}{% endblock %}
+
+{% block body %}
+	<h1>Thread: {{ thread.name }}</h1>
+	{{ m.breadcrumbs(board, thread) }}
+
+	<table class="table-striped table table-bordered table-condensed fullwidth">
+		<colgroup>
+			<col width="150px">
+		</colgroup>
+		{% for p in posts %}
+		<tr>
+			<td>
+				<a href="{{ url_for('.user', id=p.author_id) }}">{{ p.author.nickname }}</a><br>
+				posted on<br>
+				{{ p.readable_date(p.created) }}
+			</td>
+			<td>
+				{{ p.content|markdown }}
+				{% if p.author_id == current_user.id %}<a href="{{ url_for('.edit_post', slug=board.slug, thread_id=thread.id, post_id=p.id) }}">[edit]</a>{% endif %}
+			</td>
+		</tr>
+		{% endfor %}
+	</table>
+
+	<a href="{{ url_for('.create_post', slug=board.slug, id=thread.id) }}" class="btn btn-primary")>Reply</a>
+{% endblock %}

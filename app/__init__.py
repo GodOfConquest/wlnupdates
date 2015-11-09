@@ -10,6 +10,7 @@ from flask_debugtoolbar import DebugToolbarExtension
 from config import basedir
 import datetime
 from babel.dates import format_datetime
+from flask.ext.assets import Bundle, Environment
 
 import urllib.parse
 
@@ -61,6 +62,30 @@ if not app.debug:
 	app.logger.addHandler(file_handler)
 	app.logger.setLevel(logging.INFO)
 	app.logger.info('wlnupdates startup')
+
+
+
+# ========================================================
+# Forum
+# ========================================================
+
+assets = Environment(app)
+assets.url = '/static'
+assets.directory = app.config['ASSETS_DEST']
+
+less = Bundle('less/style.less', filters='less', output='gen/style.css')
+assets.register('all-css', less)
+
+import forum.forum.views as forum
+app.register_blueprint(forum.bp, url_prefix='/forum')
+
+# Admin
+from forum import admin
+
+from flask.ext.markdown import Markdown
+Markdown(app, safe_mode='escape')
+
+# ========================================================
 
 
 from app import views, models

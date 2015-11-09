@@ -9,6 +9,8 @@ from app.models import Author
 from app.models import Illustrators
 from app.models import Translators
 from app.models import Watches
+from app.models import Publishers
+from app.models import Ratings
 from app.models import AlternateNames
 from app.models import AlternateTranslatorNames
 import markdown
@@ -21,6 +23,10 @@ from flask.ext.login import current_user
 import datetime
 import app.nameTools as nt
 
+from sqlalchemy.sql import func
+
+from flask import g
+from flask import request
 
 def getCurrentUserId():
 	'''
@@ -33,18 +39,29 @@ def getCurrentUserId():
 	else:
 		return app.config['SYSTEM_USERID']
 
-def updateTags(series, tags, deleteother=True):
+def updateTags(series, tags, deleteother=True, allow_new=True):
 	havetags = Tags.query.filter((Tags.series==series.id)).all()
 	havetags = {item.tag.lower() : item for item in havetags}
 
 	tags = [tag.lower().strip().replace(" ", "-") for tag in tags]
+	tags = [bleach.clean(item, strip=True) for item in tags]
 	tags = [tag for tag in tags if tag.strip()]
 	for tag in tags:
 		if tag in havetags:
 			havetags.pop(tag)
 		else:
-			newtag = Tags(series=series.id, tag=tag, changetime=datetime.datetime.now(), changeuser=getCurrentUserId())
-			db.session.add(newtag)
+			# If we're set to allow new, don't bother checking for other instances of the tag.
+			if allow_new:
+				newtag = Tags(series=series.id, tag=tag, changetime=datetime.datetime.now(), changeuser=getCurrentUserId())
+				db.session.add(newtag)
+			else:
+				# Otherwise, make sure that tag already exists in the database before adding it.
+				exists = Tags.query.filter((Tags.tag==tag)).count()
+				if exists:
+					newtag = Tags(series=series.id, tag=tag, changetime=datetime.datetime.now(), changeuser=getCurrentUserId())
+					db.session.add(newtag)
+
+
 	if deleteother:
 		for key, value in havetags.items():
 			db.session.delete(value)
@@ -55,6 +72,7 @@ def updateGenres(series, genres, deleteother=True):
 	havegenres = {item.genre.lower() : item for item in havegenres}
 
 	genres = [genre.lower().strip().replace(" ", "-") for genre in genres]
+	genres = [bleach.clean(item, strip=True) for item in genres]
 	genres = [genre for genre in genres if genre.strip()]
 	for genre in genres:
 		if genre in havegenres:
@@ -64,6 +82,24 @@ def updateGenres(series, genres, deleteother=True):
 			db.session.add(newgenre)
 	if deleteother:
 		for key, value in havegenres.items():
+			db.session.delete(value)
+	db.session.commit()
+
+def updatePublishers(series, publishers, deleteother=True):
+	havePublishers = Publishers.query.filter((Publishers.series==series.id)).all()
+	havePublishers = {item.name.lower() : item for item in havePublishers}
+
+	publishers = [publisher.strip() for publisher in publishers]
+	publishers = [bleach.clean(item, strip=True) for item in publishers]
+	publishers = [publisher for publisher in publishers if publisher.strip()]
+	for publisher in publishers:
+		if publisher.lower() in havePublishers:
+			havePublishers.pop(publisher.lower())
+		else:
+			newgenre = Publishers(series=series.id, name=publisher, changetime=datetime.datetime.now(), changeuser=getCurrentUserId())
+			db.session.add(newgenre)
+	if deleteother:
+		for dummy_key, value in havePublishers.items():
 			db.session.delete(value)
 	db.session.commit()
 
@@ -77,7 +113,7 @@ def updateAltNames(series, altnames, deleteother=True):
 			cleaned[name.lower().strip()] = name
 
 	havenames = AlternateNames.query.filter(AlternateNames.series==series.id).order_by(AlternateNames.name).all()
-	havenames = {name.name.lower().strip() : name for name in havenames}
+	havenames = {bleach.clean(name.name.lower().strip(), strip=True) : name for name in havenames}
 
 	for name in cleaned.keys():
 		if name in havenames:
@@ -124,7 +160,7 @@ def setAuthorIllust(series, author=None, illust=None, deleteother=True):
 		else:
 			newentry = table(
 					series     = series.id,
-					name       = initems[name],
+					name       = bleach.clean(initems[name], strip=True),
 					changetime = datetime.datetime.now(),
 					changeuser = getCurrentUserId()
 				)
@@ -154,7 +190,7 @@ def updateGroupAltNames(group, altnames, deleteother=True):
 			havenames.pop(name)
 		else:
 			newname = AlternateTranslatorNames(
-					name       = cleaned[name],
+					name       = bleach.clean(cleaned[name], strip=True),
 					cleanname  = nt.prepFilenameForMatching(cleaned[name]),
 					group     = group.id,
 					changetime = datetime.datetime.now(),
@@ -218,3 +254,62 @@ def saveCoverFile(filecont, filename):
 	if locpath.startswith("/"):
 		locpath = locpath[1:]
 	return locpath
+
+
+def get_identifier():
+	if not g.user.is_anonymous():
+		return g.user.id, None
+	else:
+		if request.headers.get('X-Forwarded-For'):
+			return None, request.headers.get('X-Forwarded-For')
+		else:
+			return None, request.remote_addr
+
+
+
+def set_rating(sid, new_rating):
+	uid, ip = get_identifier()
+	print("Set-rating call for sid %s, uid %s, ip %s. Rating: %s" % (sid, uid, ip, new_rating))
+	user_rtng = Ratings.query \
+		.filter(Ratings.series_id == sid) \
+		.filter(Ratings.user_id   == uid) \
+		.filter(Ratings.source_ip == ip ) \
+		.scalar()
+
+
+	if user_rtng:
+		user_rtng.rating = new_rating
+	else:
+		new_row = Ratings(
+				rating    = new_rating,
+				series_id = sid,
+				user_id   = uid,
+				source_ip = ip,
+			)
+		db.session.add(new_row)
+
+	db.session.commit()
+
+
+def get_rating(sid):
+	uid, ip = get_identifier()
+	# print("Get-rating call for sid %s, uid %s, ip %s." % (sid, uid, ip))
+	user_rtng = Ratings.query \
+		.filter(Ratings.series_id == sid) \
+		.filter(Ratings.user_id   == uid) \
+		.filter(Ratings.source_ip == ip ) \
+		.scalar()
+
+
+	avg, count = db.session.query(func.avg(Ratings.rating).label('average'), func.count(Ratings.rating).label('count')).filter(Ratings.series_id == sid).one()
+	user_rtng = -1 if user_rtng == None else user_rtng.rating
+
+	# print("Rating - Average: %s from %s ratings, user-rating: %s" % (avg, count, user_rtng))
+	# Rating return is the current user's rating, average rating, and the number of contributing ratings
+	# for that average.
+	ret = {
+		"user" : user_rtng,
+		"avg"  : avg,
+		"num"  : count,
+	}
+	return ret

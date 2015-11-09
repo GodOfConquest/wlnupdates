@@ -1,0 +1,20 @@
+{% extends 'forum/layout.html' %}
+{% import 'forum/macros.html' as m %}
+
+{% block title %}New post in "{{ thread.name }}"{% endblock %}
+
+{% block body %}
+<h1>{{ thread.name }}</h1>
+
+{{ m.breadcrumbs(board, thread) }}
+
+<form method="POST" action="">
+	{{ form.csrf_token }}
+	<div class="form-group">
+		<label>Edit Content:</label>
+		{{ form.content(class_="form-control", rows='12') }}
+		Posts will be formatted with <a href="https://help.github.com/articles/markdown-basics/">markdown</a>.
+	</div>
+	{{ form.submit(class_="btn btn-success") }}
+</form>
+{% endblock %}

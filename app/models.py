@@ -16,6 +16,7 @@ from sqlalchemy_utils.types import TSVectorType
 import sqlalchemy.exc
 import datetime
 from settings import DATABASE_DB_NAME
+from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects.postgresql import ENUM
 
 # Some of the metaclass hijinks make pylint confused,
@@ -47,6 +48,8 @@ class SeriesBase(object):
 	region      = db.Column(region_enum, default='unknown')
 	tl_type     = db.Column(tl_type_enum, nullable=False, index=True)
 	license_en  = db.Column(db.Boolean)
+
+	pub_date    = db.Column(db.DateTime)
 
 class TagsBase(object):
 	id          = db.Column(db.Integer, primary_key=True)
@@ -98,6 +101,16 @@ class AlternateTranslatorNamesBase(object):
 
 class TranslatorsBase(object):
 	id    = db.Column(db.Integer, primary_key=True)
+	name  = db.Column(CIText(), nullable=False)
+	site  = db.Column(db.Text())
+
+class PublishersBase(object):
+	id    = db.Column(db.Integer, primary_key=True)
+
+	@declared_attr
+	def series(cls):
+		return db.Column(db.Integer, db.ForeignKey('series.id'))
+
 	name  = db.Column(CIText(), nullable=False)
 	site  = db.Column(db.Text())
 
@@ -187,6 +200,8 @@ class Series(db.Model, SeriesBase, ModificationInfoMixin):
 	alternatenames = relationship("AlternateNames", backref='Series')
 	covers         = relationship("Covers",         backref='Series')
 	releases       = relationship("Releases",       backref='Series')
+	publishers     = relationship("Publishers",     backref='Series')
+
 
 
 
@@ -259,6 +274,17 @@ class Translators(db.Model, TranslatorsBase, ModificationInfoMixin):
 	releases        = relationship("Releases",                 backref='Translators')
 	alt_names       = relationship("AlternateTranslatorNames", backref='Translators')
 
+
+class Publishers(db.Model, PublishersBase, ModificationInfoMixin):
+	__tablename__ = 'publishers'
+	__searchable__ = ['name']
+
+	__table_args__ = (
+		db.UniqueConstraint('series', 'name'),
+		)
+
+	series_row     = relationship("Series",         backref='Publisher')
+
 class Releases(db.Model, ReleasesBase, ModificationInfoMixin):
 	__tablename__ = 'releases'
 	translators      = relationship("Translators",         backref='Releases')
@@ -313,6 +339,10 @@ class CoversChanges(db.Model, CoversBase, ModificationInfoMixin, ChangeLogMixin)
 class AlternateNamesChanges(db.Model, AlternateNamesBase, ModificationInfoMixin, ChangeLogMixin):
 	__tablename__ = "alternatenameschanges"
 	srccol   = db.Column(db.Integer, db.ForeignKey('alternatenames.id', ondelete="SET NULL"), index=True)
+
+class PublishersChanges(db.Model, PublishersBase, ModificationInfoMixin, ChangeLogMixin):
+	__tablename__ = "publisherschanges"
+	srccol   = db.Column(db.Integer, db.ForeignKey('publishers.id', ondelete="SET NULL"), index=True)
 
 
 class AlternateTranslatorNamesChanges(db.Model, AlternateTranslatorNamesBase, ModificationInfoMixin, ChangeLogMixin):
@@ -405,6 +435,7 @@ trigger_on = [
 	Language,
 	Covers,
 	AlternateTranslatorNames,
+	Publishers,
 ]
 
 def install_trigram_indice_on_column(table, column):
@@ -499,7 +530,7 @@ class FeedTags(db.Model):
 		)
 
 
-class Posts(db.Model):
+class News_Posts(db.Model):
 	__searchable__ = ['body']
 
 	id          = db.Column(db.Integer, primary_key=True)
@@ -531,19 +562,39 @@ class Watches(db.Model):
 	series_row       = relationship("Series",         backref='Watches')
 
 
+
+class Ratings(db.Model):
+	id          = db.Column(db.Integer, primary_key=True)
+	user_id     = db.Column(db.Integer, db.ForeignKey('users.id'), index=True)
+	series_id   = db.Column(db.Integer, db.ForeignKey('series.id'), index=True)
+	source_ip   = db.Column(db.Text, index=True)
+
+	rating      = db.Column(db.Float(), default=-1)
+
+	__table_args__ = (
+		db.UniqueConstraint('user_id', 'source_ip', 'series_id'),
+		db.CheckConstraint('rating >=  0', name='rating_min'),
+		db.CheckConstraint('rating <= 10', name='rating_max'),
+		db.CheckConstraint('''(user_id IS NOT NULL AND source_ip IS NULL) OR (user_id IS NULL AND source_ip IS NOT NULL)''', name='rating_src'),
+	)
+
+
+	series_row       = relationship("Series",         backref='Ratings')
+
+
 class Users(db.Model):
-	id        = db.Column(db.Integer, primary_key=True)
-	nickname  = db.Column(CIText(),  index=True, unique=True)
-	password  = db.Column(db.String,  index=True, unique=True)
-	email     = db.Column(db.String,  index=True, unique=True)
-	verified  = db.Column(db.Integer, nullable=False)
+	id         = db.Column(db.Integer, primary_key=True)
+	nickname   = db.Column(CIText(),  index=True, unique=True)
+	password   = db.Column(db.String,  index=True, unique=True)
+	email      = db.Column(db.String,  index=True, unique=True)
+	verified   = db.Column(db.Integer, nullable=False)
 
-	last_seen = db.Column(db.DateTime)
+	last_seen  = db.Column(db.DateTime)
 
-	has_admin = db.Column(db.Boolean, default=False)
-	has_mod   = db.Column(db.Boolean, default=False)
+	has_admin  = db.Column(db.Boolean, default=False)
+	has_mod    = db.Column(db.Boolean, default=False)
 
-	posts     = db.relationship('Posts')
+	news_posts = db.relationship('News_Posts')
 	# posts     = db.relationship('Post', backref='author', lazy='dynamic')
 
 

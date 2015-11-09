@@ -9,6 +9,7 @@ from app.models import Author
 from app.models import Illustrators
 from app.models import Translators
 from app.models import Watches
+from flask import g
 from app.models import AlternateNames
 from app.models import AlternateTranslatorNames
 import markdown
@@ -19,8 +20,9 @@ import hashlib
 from data_uri import DataURI
 from flask.ext.login import current_user
 import datetime
+import dateutil.parser
 import app.nameTools as nt
-
+import datetime
 from app.api_common import getResponse
 import app.series_tools
 
@@ -40,9 +42,31 @@ VALID_KEYS = {
 	'orig_status-container'  : 'orig_status',
 	'tl_type-container'      : 'tl_type',
 	'website-container'      : 'website',
+	'publisher-container'    : 'publisher',
+	'pub_date-container'     : 'first_publish_date',
 	'watch-container'        : None,
 
 	}
+
+# {
+# 	'mode': 'manga-update',
+# 	'item-id': '532',
+# 	'entries':
+# 		[
+# 			{
+# 				'type': 'combobox',
+# 				'key': 'watch-container',
+# 				'value': 'no-list'
+# 			},
+# 			{
+# 				'type': 'multiitem',
+# 				'key': 'publisher-container',
+# 				'value': 'Test'
+# 			}
+# 		]
+# }
+
+
 
 VALID_LICENSE_STATES = {
 	"unknown" : None,
@@ -85,10 +109,15 @@ def validateMangaData(data):
 		assert 'key' in item
 
 		itemType = item['type']
-		assert itemType in ['singleitem', 'multiitem', 'combobox']
+		assert itemType in ['singleitem', 'multiitem', 'combobox', 'datebox']
 
 		if itemType == 'singleitem' or itemType == 'combobox':
 			val['data'] = item['value'].strip()
+		elif itemType == 'datebox':
+			try:
+				val['data'] = dateutil.parser.parse(item['value'])
+			except ValueError:
+				raise AssertionError("Date updates must be a ISO 8601 string!")
 		elif itemType == 'multiitem':
 			tmp         = [entry.strip() for entry in item['value'].strip().split("\n")]
 			val['data'] = [entry for entry in tmp if entry]
@@ -226,11 +255,23 @@ def processMangaUpdateJson(data):
 				# print("No change?")
 				pass
 			else:
-				series.website = processedData
+				series.website    = processedData
+				series.changeuser = getCurrentUserId()
+				series.changetime = datetime.datetime.now()
+
+		elif entry['type'] == 'first_publish_date':
+			pub_date = entry['data']
+			if series.pub_date == pub_date:
+				# print("No change?")
+				pass
+			else:
+				series.pub_date   = pub_date
+				print("Publish date: ", series.pub_date)
 				series.changeuser = getCurrentUserId()
 				series.changetime = datetime.datetime.now()
 
 		elif entry['type'] == 'author':
+
 			ret = app.series_tools.setAuthorIllust(series, author=entry['data'])
 			if ret:
 				return ret
@@ -240,14 +281,25 @@ def processMangaUpdateJson(data):
 			if ret:
 				return ret
 
+		elif entry['type'] == 'publisher':
+			ret = app.series_tools.updatePublishers(series, publishers=entry['data'])
+			if ret:
+				return ret
+
 		elif entry['type'] == 'tag':
-			app.series_tools.updateTags(series, entry['data'])
+			ret = app.series_tools.updateTags(series, entry['data'])
+			if ret:
+				return ret
 
 		elif entry['type'] == 'genre':
-			app.series_tools.updateGenres(series, entry['data'])
+			ret = app.series_tools.updateGenres(series, entry['data'])
+			if ret:
+				return ret
 
 		elif entry['type'] == 'alternate-names':
-			app.series_tools.updateAltNames(series, entry['data'])
+			ret = app.series_tools.updateAltNames(series, entry['data'])
+			if ret:
+				return ret
 		else:
 			raise AssertionError("Unknown modifification type!")
 
@@ -289,6 +341,17 @@ def validateWatchedData(data):
 		raise AssertionError
 	if len(update['listName']) > 256:
 		raise AssertionError
+
+	# Special case handle the special list name that removes the item from the list.
+	# Set the watch to none, so the corresponsing list gets deleted.
+	# Yes, this is a hack, and I'm ignoring the "watch" boolean field in the
+	# API params, but... eh. It's easier to fix here then in the javascript.
+	if update['listName'] == '-0-0-0-0-0-0-0-no-list-0-0-0-0-0-0-0-0-':
+		# print("List deletion token!")
+		update['watch'] = False
+		# print("Doing watch:", update['watch'])
+
+	# print("update['listName'] == '-0-0-0-0-0-0-0-no-list-0-0-0-0-0-0-0-0-': ", update['listName'] == '-0-0-0-0-0-0-0-no-list-0-0-0-0-0-0-0-0-')
 
 	# Ok, the JSON is valid, and we've more or less sanitized it.
 	# Return the processed output.
@@ -658,9 +721,19 @@ def updateAddCoversJson(data):
 			return ret
 	return getResponse("Success", False)
 
-# {'value': '',
-# 'type': 'singleitem',
-# 'key': 'demographic-container'},
 
-# {'value': 'Novel\n', 'type': 'singleitem', 'key': 'type-container'}, {'value': '', 'type': 'singleitem', 'key': 'origin_loc-container'}], 'mode': 'manga-update'}
+def setRatingJson(data):
+	assert 'mode' in data
+	assert 'rating' in data
+	assert 'item-id' in data
+	assert data['item-id']
+	sid    = int(data['item-id'])
+	rating = int(data['rating'])
+
+	app.series_tools.set_rating(sid, rating)
+
+	return getResponse("SetRating call!.", error=False)
+
+
+
 

@@ -3,6 +3,7 @@ from flask import flash
 from flask import redirect
 from flask import url_for
 from flask import g
+from flask import request
 from flask.ext.babel import gettext
 # from guess_language import guess_language
 from app import app
@@ -14,6 +15,7 @@ from app.models import Author
 from app.models import Illustrators
 from app.models import Translators
 from app.models import Releases
+from app.models import Publishers
 from app.models import Watches
 
 from sqlalchemy import desc
@@ -21,10 +23,11 @@ from natsort import natsort_keygen
 from sqlalchemy.orm import joinedload
 import datetime
 
+from app.series_tools import get_rating
+
 def getSort(row):
 	chp = row.chapter if row.chapter else 0
 	vol = row.volume  if row.volume  else 0
-
 	return vol * 1e6 + chp
 
 def build_progress(watch):
@@ -98,6 +101,7 @@ def get_cover_sorter():
 	sorter = natsort_keygen(key=lambda x: str(x.description).replace('〈', '').replace('〉', ''))
 	return sorter
 
+
 @app.route('/series-id/<sid>/')
 def renderSeriesId(sid):
 	series       =       Series.query
@@ -161,21 +165,24 @@ def renderSeriesId(sid):
 
 	series.covers.sort(key=get_cover_sorter())
 
+	rating = get_rating(sid)
+
 
 
 
 
 	return render_template('series-id.html',
-						series_id    = sid,
-						series       = series,
-						releases     = releases,
-						watch        = watch,
-						watchlists   = watchlists,
-						progress     = progress,
-						latest       = latest,
-						latest_dict  = latest_dict,
-						most_recent  = most_recent,
-						latest_str   = latest_str
+						series_id     = sid,
+						series        = series,
+						releases      = releases,
+						watch         = watch,
+						watchlists    = watchlists,
+						progress      = progress,
+						latest        = latest,
+						latest_dict   = latest_dict,
+						most_recent   = most_recent,
+						latest_str    = latest_str,
+						series_rating = rating,
 						)
 
 
@@ -267,6 +274,39 @@ def renderTagId(sid, page=1):
 						   page_url_prefix = 'series-id',
 						   searchTarget    = 'Tags',
 						   searchValue     = tag.tag
+						   )
+
+@app.route('/publisher-id/<sid>/<int:page>')
+@app.route('/publisher-id/<sid>/')
+def renderPublisherId(sid, page=1):
+
+	pub = Publishers.query.filter(Publishers.id==sid).first()
+
+	if pub is None:
+		flash(gettext('Tag not found? This is probably a error!'))
+		return redirect(url_for('renderTagTable'))
+
+	# Look up the ascii value of the tag, and then find
+	# all the links containing it.
+	# Table is CITEXT, so we don't care about case.
+
+	# this should REALLY have another indirection table.
+
+	items = Publishers.query.filter(Publishers.name==pub.name).all()
+	ids = []
+	for item in items:
+		ids.append(item.series)
+
+	series = Series.query.filter(Series.id.in_(ids)).order_by(Series.title)
+
+	series_entries = series.paginate(page, app.config['SERIES_PER_PAGE'], False)
+	return render_template('search_results.html',
+						   sequence_item   = series_entries,
+						   page            = page,
+						   name_key        = "title",
+						   page_url_prefix = 'series-id',
+						   searchTarget    = 'Publishers',
+						   searchValue     = pub.name
 						   )
 
 

@@ -307,7 +307,7 @@ def update_series_info(item):
 
 	app.series_tools.setAuthorIllust(series, author=[item['author'], ])
 
-	app.series_tools.updateTags(series, item['tags'], deleteother=False)
+	app.series_tools.updateTags(series, item['tags'], deleteother=False, allow_new=False)
 
 
 	db.session.flush()
@@ -317,6 +317,16 @@ def dispatchItem(item):
 	item = json.loads(item)
 	assert 'type' in item
 	assert 'data' in item
+
+
+	beta_enabled = getattr(settings, "ENABLE_BETA", False)
+	if "beta" in item:
+		if item['beta'] == True and not beta_enabled:
+			return
+		elif item['beta'] == True and beta_enabled:
+			print("Beta release!")
+
+
 
 	try:
 		if item['type'] == 'raw-feed':
@@ -368,6 +378,9 @@ class FeedFeeder(object):
 						fp.write(traceback.format_exc())
 					print("Error!")
 					traceback.print_exc()
+
+	def close(self):
+		self.feeder.close()
 
 	def __del__(self):
 		print("FeedFeeder being deleted")
